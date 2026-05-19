@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sociahive"
+version = "0.1.0"
+description = "Official Python SDK for the SociaHive API — social media management, automation flows, and analytics."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+authors = [{ name = "SociaHive", email = "support@sociahive.com" }]
+keywords = ["sociahive", "social-media", "instagram", "automation", "scheduler", "mcp"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+  "httpx>=0.27",
+]
+
+[project.urls]
+Homepage = "https://www.sociahive.com/mcp"
+Repository = "https://github.com/sociahive/sociahive-python"
+Documentation = "https://www.sociahive.com/api/v1/docs"
+
+[tool.hatch.build.targets.wheel]
+packages = ["sociahive"]
