@@ -9,7 +9,7 @@ description = "Official Python SDK for the SociaHive API — social media manage
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.9"
-authors = [{ name = "SociaHive", email = "support@sociahive.com" }]
+authors = [{ name = "SociaHive", email = "info@sociahive.com" }]
 keywords = ["sociahive", "social-media", "instagram", "automation", "scheduler", "mcp"]
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -27,9 +27,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://www.sociahive.com/mcp"
+Homepage = "https://docs.sociahive.com"
 Repository = "https://github.com/sociahive/sociahive-python"
-Documentation = "https://www.sociahive.com/api/v1/docs"
+Documentation = "https://docs.sociahive.com/developer-quickstart"
+Issues = "https://github.com/sociahive/sociahive-python/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["sociahive"]
