@@ -1,7 +1,7 @@
 """SociaHive client — thin ergonomic wrapper over httpx.
 
 Mirrors the resource grouping in @sociahive/sdk (Node): ``sh.accounts``,
-``sh.posts``, ``sh.flows``, ``sh.analytics``.
+``sh.posts``, ``sh.flows``, ``sh.analytics``, ``sh.autopilot``.
 
 Auth: pass exactly one of ``api_key`` (long-lived) or ``oauth_token`` (per-user OAuth).
 """
@@ -211,6 +211,104 @@ class _Flows(_Resource):
         return self._client._request("POST", "/flows/generate", json=body)
 
 
+class _Autopilot(_Resource):
+    """Scheduler Autopilot — weekly AI content generation.
+
+    Reads require the ``autopilot:read`` scope; every write method
+    (``generate``, ``adjust``, ``update_brand_kit``, ``approve``,
+    ``turn_on``) requires ``autopilot:write``.
+    """
+
+    def status(self) -> dict[str, Any]:
+        """Current autopilot config + state.
+
+        Returns ``{ enabled, configured, review_mode, posts_per_week,
+        account_ids, paused_reason, last_generated_at }``.
+        """
+        return self._client._request("GET", "/autopilot/config")
+
+    def generate(self) -> dict[str, Any]:
+        """Kick off this week's batch generation (202 accepted).
+
+        Returns ``{ week_start, batch_id, generating }``.
+        """
+        return self._client._request("POST", "/autopilot/generate")
+
+    def adjust(self, feedback: str | None = None) -> dict[str, Any]:
+        """Nudge the planner with free-form feedback (202 accepted)."""
+        body: dict[str, Any] = {}
+        if feedback is not None:
+            body["feedback"] = feedback
+        return self._client._request("POST", "/autopilot/adjust", json=body)
+
+    def update_brand_kit(
+        self, *,
+        voice_preset: str,
+        business_name: str | None = None,
+        what_you_do: str | None = None,
+        audience: str | None = None,
+        voice_note: str | None = None,
+        banned_words: list[str] | None = None,
+        content_pillars: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Update the per-account Brand Kit that grounds generation.
+
+        The API body is snake_case with a nested, required ``voice`` object
+        (``{ preset, custom_note? }``). ``voice_preset`` is required and must be
+        one of ``warm`` | ``expert`` | ``playful``. Only provided fields are
+        sent. Returns ``{ ok, brand_kit }``.
+        """
+        body: dict[str, Any] = {"voice": {"preset": voice_preset}}
+        if voice_note is not None:
+            body["voice"]["custom_note"] = voice_note
+        if business_name is not None:
+            body["business_name"] = business_name
+        if what_you_do is not None:
+            body["what_you_do"] = what_you_do
+        if audience is not None:
+            body["audience"] = audience
+        if banned_words is not None:
+            body["banned_words"] = banned_words
+        if content_pillars is not None:
+            body["pillars"] = content_pillars
+        return self._client._request("PUT", "/autopilot/brand-kit", json=body)
+
+    def approve(self, batch_id: str | None = None, *, confirm: bool) -> dict[str, Any]:
+        """Approve this week's batch and schedule it — IRREVERSIBLE go-live.
+
+        The API rejects the call with ``400 confirmation_required`` unless
+        ``confirm=True``. ``confirm`` is a required keyword-only argument to
+        force an explicit opt-in at the call site. Returns
+        ``{ ok, scheduled, failed }``.
+        """
+        body: dict[str, Any] = {"confirm": confirm}
+        if batch_id is not None:
+            body["batch_id"] = batch_id
+        return self._client._request("POST", "/autopilot/approve", json=body)
+
+    def turn_on(
+        self, *,
+        posts_per_week: int | None = None,
+        review_mode: str | None = None,
+        account_ids: list[str] | None = None,
+        confirm: bool,
+    ) -> dict[str, Any]:
+        """Enable autopilot — IRREVERSIBLE.
+
+        The API rejects the call with ``400 confirmation_required`` unless
+        ``confirm=True``. ``confirm`` is a required keyword-only argument.
+        Returns ``{ ok, enabled, clamped, config }``.
+        """
+        body: dict[str, Any] = {"confirm": confirm}
+        if posts_per_week is not None:
+            body["posts_per_week"] = posts_per_week
+        if review_mode is not None:
+            body["review_mode"] = review_mode
+        if account_ids is not None:
+            body["account_ids"] = account_ids
+        return self._client._request("POST", "/autopilot/turn-on", json=body)
+
+
 class _Analytics(_Resource):
     def get(
         self, *,
@@ -272,6 +370,7 @@ class SociaHive:
         self.posts = _Posts(self)
         self.flows = _Flows(self)
         self.analytics = _Analytics(self)
+        self.autopilot = _Autopilot(self)
 
     def close(self) -> None:
         self._http.close()

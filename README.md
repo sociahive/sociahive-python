@@ -74,6 +74,55 @@ except SociaHiveError as err:
 | `sh.posts` | `list`, `get`, `create`, `update`, `schedule`, `publish`, `cancel`, `bulk` |
 | `sh.flows` | `list`, `get`, `create`, `update`, `delete`, `activate`, `deactivate`, `add_node`, `update_node`, `add_edge`, `stats`, `collected_data`, `generate` |
 | `sh.analytics` | `get`, `export` |
+| `sh.autopilot` | `status`, `generate`, `adjust`, `update_brand_kit`, `approve`, `turn_on` |
+
+## Autopilot
+
+Weekly AI content generation for the scheduler — SociaHive plans, writes,
+designs, and schedules a full week of on-brand posts. You review the week
+(approve mode) or let it ship (autopublish mode).
+
+```python
+# Where things stand (autopilot:read)
+state = sh.autopilot.status()
+print(state["enabled"], state["review_mode"], state["posts_per_week"])
+
+# Ground generation in your brand (autopilot:write)
+sh.autopilot.update_brand_kit(
+    business_name="Acme Studio",
+    what_you_do="Hand-poured candles",
+    audience="home-decor lovers",
+    voice_preset="warm",
+    banned_words=["cheap"],
+    content_pillars=["behind the scenes", "product", "education"],
+)
+
+# Kick off this week's batch, then nudge the planner
+batch = sh.autopilot.generate()   # -> { week_start, batch_id, generating }
+sh.autopilot.adjust("lean into the holiday theme")
+```
+
+Two calls go irreversibly live, so `confirm` is a **required keyword-only**
+argument. Without `confirm=True` the API returns `400 confirmation_required`:
+
+```python
+# Enable autopilot — IRREVERSIBLE
+sh.autopilot.turn_on(posts_per_week=7, review_mode="approve", confirm=True)
+
+# Approve this week's batch and schedule it — IRREVERSIBLE go-live
+sh.autopilot.approve(batch["batch_id"], confirm=True)
+```
+
+**Scopes:** `status()` needs `autopilot:read`; every write method
+(`generate`, `adjust`, `update_brand_kit`, `approve`, `turn_on`) needs
+`autopilot:write`.
+
+## Development
+
+```bash
+pip install -e ".[dev]"
+pytest
+```
 
 For other endpoints, fall back to `httpx` directly with `X-API-Key`. Full spec:
 <https://www.sociahive.com/api/v1/openapi.json>.

@@ -26,6 +26,11 @@ dependencies = [
   "httpx>=0.27",
 ]
 
+[project.optional-dependencies]
+dev = [
+  "pytest>=7",
+]
+
 [project.urls]
 Homepage = "https://docs.sociahive.com"
 Repository = "https://github.com/sociahive/sociahive-python"
