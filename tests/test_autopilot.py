@@ -97,26 +97,27 @@ def test_adjust_with_feedback() -> None:
     sh.close()
 
 
-def test_update_brand_kit_maps_snake_case_to_camel_case() -> None:
+def test_update_brand_kit_maps_to_api_snake_case_body() -> None:
     handler, seen = _capture({"ok": True, "brand_kit": {}})
     sh = _make_client(handler)
     sh.autopilot.update_brand_kit(
         business_name="Acme Co",
         what_you_do="We sell widgets",
         audience="SMB owners",
-        voice_preset="friendly",
+        voice_preset="warm",
+        voice_note="approachable but sharp",
         banned_words=["cheap", "spam"],
         content_pillars=["education", "product"],
     )
     assert seen["method"] == "PUT"
     assert seen["path"] == "/api/v1/autopilot/brand-kit"
     assert seen["body"] == {
-        "businessName": "Acme Co",
-        "whatYouDo": "We sell widgets",
+        "voice": {"preset": "warm", "custom_note": "approachable but sharp"},
+        "business_name": "Acme Co",
+        "what_you_do": "We sell widgets",
         "audience": "SMB owners",
-        "voicePreset": "friendly",
-        "bannedWords": ["cheap", "spam"],
-        "contentPillars": ["education", "product"],
+        "banned_words": ["cheap", "spam"],
+        "pillars": ["education", "product"],
     }
     sh.close()
 
@@ -124,8 +125,9 @@ def test_update_brand_kit_maps_snake_case_to_camel_case() -> None:
 def test_update_brand_kit_only_sends_provided_fields() -> None:
     handler, seen = _capture({"ok": True, "brand_kit": {}})
     sh = _make_client(handler)
-    sh.autopilot.update_brand_kit(business_name="Acme Co")
-    assert seen["body"] == {"businessName": "Acme Co"}
+    # voice is required by the API, so it is always present.
+    sh.autopilot.update_brand_kit(voice_preset="expert", business_name="Acme Co")
+    assert seen["body"] == {"voice": {"preset": "expert"}, "business_name": "Acme Co"}
     sh.close()
 
 

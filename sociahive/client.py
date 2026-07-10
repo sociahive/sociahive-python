@@ -243,31 +243,34 @@ class _Autopilot(_Resource):
 
     def update_brand_kit(
         self, *,
+        voice_preset: str,
         business_name: str | None = None,
         what_you_do: str | None = None,
         audience: str | None = None,
-        voice_preset: str | None = None,
+        voice_note: str | None = None,
         banned_words: list[str] | None = None,
         content_pillars: list[str] | None = None,
     ) -> dict[str, Any]:
         """Update the per-account Brand Kit that grounds generation.
 
-        SDK snake_case args map to the API's camelCase body keys. Only
-        provided fields are sent. Returns ``{ ok, brand_kit }``.
+        The API body is snake_case with a nested, required ``voice`` object
+        (``{ preset, custom_note? }``). ``voice_preset`` is required and must be
+        one of ``warm`` | ``expert`` | ``playful``. Only provided fields are
+        sent. Returns ``{ ok, brand_kit }``.
         """
-        body: dict[str, Any] = {}
+        body: dict[str, Any] = {"voice": {"preset": voice_preset}}
+        if voice_note is not None:
+            body["voice"]["custom_note"] = voice_note
         if business_name is not None:
-            body["businessName"] = business_name
+            body["business_name"] = business_name
         if what_you_do is not None:
-            body["whatYouDo"] = what_you_do
+            body["what_you_do"] = what_you_do
         if audience is not None:
             body["audience"] = audience
-        if voice_preset is not None:
-            body["voicePreset"] = voice_preset
         if banned_words is not None:
-            body["bannedWords"] = banned_words
+            body["banned_words"] = banned_words
         if content_pillars is not None:
-            body["contentPillars"] = content_pillars
+            body["pillars"] = content_pillars
         return self._client._request("PUT", "/autopilot/brand-kit", json=body)
 
     def approve(self, batch_id: str | None = None, *, confirm: bool) -> dict[str, Any]:
