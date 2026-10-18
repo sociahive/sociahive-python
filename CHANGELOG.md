@@ -16,6 +16,10 @@ All notable changes to the `sociahive` Python package are listed here. The forma
 
 - `SociaHiveError.retry_after`: seconds from the `Retry-After` header on a 429.
 
+### Removed
+
+- Autopilot methods that were on main but never released; they will return when Autopilot is available to everyone.
+
 ## [0.1.0] - 2026-05-20
 
 First release on PyPI.
