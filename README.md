@@ -25,7 +25,7 @@
 
 # sociahive
 
-Official Python SDK for the [SociaHive](https://www.sociahive.com) API: schedule and publish posts, build and run DM and comment automations, run Autopilot and read analytics from your own code.
+Official Python SDK for the [SociaHive](https://www.sociahive.com) API: schedule and publish posts, build and run DM and comment automations and read analytics from your own code.
 
 API access is part of the 7-day trial and every paid plan. On the free plan the API answers `403 upgrade_required`.
 
@@ -101,7 +101,6 @@ except SociaHiveError as err:
 | `sh.posts` | `list`, `get`, `create`, `update`, `schedule`, `publish`, `cancel`, `bulk` |
 | `sh.flows` | `list`, `get`, `create`, `update`, `delete`, `activate`, `deactivate`, `add_node`, `update_node`, `add_edge`, `stats`, `collected_data`, `generate` |
 | `sh.analytics` | `get`, `export` |
-| `sh.autopilot` | `status`, `generate`, `adjust`, `update_brand_kit`, `approve`, `turn_on` |
 
 ## Platforms
 
@@ -128,48 +127,6 @@ except SociaHiveError as err:
   <a href="https://www.sociahive.com/automation/whatsapp"><img src="https://raw.githubusercontent.com/sociahive/.github/main/assets/platforms/whatsapp.svg" alt="WhatsApp" title="WhatsApp" width="24"></a>&nbsp;&nbsp;
   <a href="https://www.sociahive.com/automation/telegram"><img src="https://raw.githubusercontent.com/sociahive/.github/main/assets/platforms/telegram.svg" alt="Telegram" title="Telegram" width="24"></a>
 </p>
-
-## Autopilot
-
-Weekly AI content generation for the scheduler: SociaHive plans, writes,
-designs, and schedules a full week of on-brand posts. You review the week
-(approve mode) or let it ship (autopublish mode). The `sh.autopilot`
-methods are on `main` and not in the published 0.1.0 yet.
-
-```python
-# Where things stand (autopilot:read)
-state = sh.autopilot.status()
-print(state["enabled"], state["review_mode"], state["posts_per_week"])
-
-# Ground generation in your brand (autopilot:write)
-sh.autopilot.update_brand_kit(
-    business_name="Acme Studio",
-    what_you_do="Hand-poured candles",
-    audience="home-decor lovers",
-    voice_preset="warm",
-    banned_words=["cheap"],
-    content_pillars=["behind the scenes", "product", "education"],
-)
-
-# Kick off this week's batch, then nudge the planner
-batch = sh.autopilot.generate()   # -> { week_start, batch_id, generating }
-sh.autopilot.adjust("lean into the holiday theme")
-```
-
-Two calls go irreversibly live, so `confirm` is a **required keyword-only**
-argument. Without `confirm=True` the API returns `400 confirmation_required`:
-
-```python
-# Enable autopilot. IRREVERSIBLE
-sh.autopilot.turn_on(posts_per_week=7, review_mode="approve", confirm=True)
-
-# Approve this week's batch and schedule it. IRREVERSIBLE go-live
-sh.autopilot.approve(batch["batch_id"], confirm=True)
-```
-
-**Scopes:** `status()` needs `autopilot:read`; every write method
-(`generate`, `adjust`, `update_brand_kit`, `approve`, `turn_on`) needs
-`autopilot:write`.
 
 ## Development
 
