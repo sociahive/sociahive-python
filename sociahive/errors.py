@@ -15,11 +15,14 @@ class SociaHiveError(Exception):
         status: int,
         body: Any = None,
         code: str | None = None,
+        retry_after: float | None = None,
     ) -> None:
         super().__init__(message)
         self.status = status
         self.body = body
         self.code = code
+        #: Seconds to wait before retrying, from the ``Retry-After`` header (set on 429).
+        self.retry_after = retry_after
 
     @property
     def is_auth_error(self) -> bool:

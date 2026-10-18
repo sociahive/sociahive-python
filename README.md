@@ -7,7 +7,8 @@
   </a>
 </p>
 
-<p align="center">The official Python SDK for the SociaHive API.</p>
+<p align="center">Run your social media from your AI tool: schedule posts, build DM and comment automations, and read analytics.</p>
+<p align="center">This is the official Python SDK for the SociaHive API.</p>
 
 <p align="center">
   <a href="https://www.sociahive.com">Website</a> ·
@@ -47,7 +48,7 @@ post = sh.posts.create(
     text="Hello from Python!",
     platforms=[{"platform": "instagram", "account_id": accounts["data"][0]["id"]}],
     schedule_type="scheduled",
-    scheduled_at="2026-06-01T09:00:00Z",
+    scheduled_at="2027-03-01T09:00:00Z",  # any future time
     timezone="UTC",
 )
 print(f"Scheduled post {post['id']}")
@@ -59,7 +60,7 @@ Pass exactly one of `api_key` (long-lived) or `oauth_token` (per-user OAuth):
 
 ```python
 sh = SociaHive(api_key="sk_...")
-sh = SociaHive(oauth_token="sh_at_...")
+sh = SociaHive(oauth_token="mcp_at_...")
 ```
 
 Generate keys at <https://www.sociahive.com/settings?tab=api-keys>.
@@ -70,9 +71,10 @@ The client holds an `httpx.Client` connection pool. Use `with` for tight scopes:
 
 ```python
 with SociaHive(api_key="sk_...") as sh:
-    for flow in sh.flows.list()["data"]:
-        if flow["status"] == "draft":
-            sh.flows.activate(flow["id"])
+    account = sh.accounts.list()["data"][0]
+    # flows.list needs the account's platform_user_id
+    for flow in sh.flows.list(platform_user_id=account["platform_user_id"])["data"]:
+        print(flow["name"], flow["status"])
 ```
 
 Outside a `with` block, call `sh.close()` when you're done.
@@ -88,9 +90,23 @@ except SociaHiveError as err:
     if err.is_auth_error:
         print("Bad API key or insufficient scope")
     elif err.is_rate_limited:
-        print("Slow down, 1000 req/hr default")
+        print(f"Rate limited, retry in {err.retry_after}s")
     else:
         print(f"HTTP {err.status}: {err}")
+```
+
+## Rate limits
+
+Limits are per user, across all your keys: 120 reads and 30 writes a minute, 5 a minute for AI generation, and 1,000 requests a day in total. A `429` carries a `Retry-After` header (`err.retry_after`); wait that long before retrying. See [rate limits](https://docs.sociahive.com/rate-limits).
+
+## Bulk actions on posts
+
+`sh.posts.bulk` applies one action to up to 50 existing posts. It does not create posts; call `sh.posts.create` for each one.
+
+```python
+sh.posts.bulk("schedule", ["p1", "p2"], scheduled_for="2027-03-01T09:00:00Z")
+sh.posts.bulk("update_status", ["p3"], status="draft")
+sh.posts.bulk("delete", ["p4"])
 ```
 
 ## What's covered
@@ -155,10 +171,9 @@ Prefer to ask instead of writing code? The same account works from your AI tool 
 
 ## Data and permissions
 
+- An API key only reaches what its scopes allow (for example `posts:read`, `posts:write`, `flows:write`). Revoke a key any time in **Settings > API keys**.
 - Accounts connect through each platform's official login and APIs. SociaHive does not scrape and never asks for your account password (Bluesky uses an app password, Telegram a bot token).
-- Platform tokens are stored encrypted on SociaHive's servers. They are never sent to your AI tool and never returned by the API.
-- Access is limited to the scopes you grant: API key scopes (for example `posts:read`, `posts:write`, `flows:write`) or the permissions you approve at OAuth sign-in, where you can choose read-only access.
-- You can revoke access at any time: revoke a key in **Settings > API keys**, or disconnect an AI tool in **Settings > Connected apps**.
+- Platform tokens are stored encrypted on SociaHive's servers and are never returned by the API.
 
 ## Links
 

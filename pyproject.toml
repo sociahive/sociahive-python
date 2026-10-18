@@ -5,11 +5,11 @@ build-backend = "hatchling.build"
 [project]
 name = "sociahive"
 version = "0.1.0"
-description = "Official Python SDK for the SociaHive API — social media management, automation flows, and analytics."
+description = "Official Python SDK for the SociaHive API: post scheduling, DM and comment automations, and analytics."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.9"
-authors = [{ name = "SociaHive", email = "info@sociahive.com" }]
+authors = [{ name = "SociaHive", email = "support@sociahive.com" }]
 keywords = ["sociahive", "social-media", "instagram", "automation", "scheduler", "mcp"]
 classifiers = [
   "Development Status :: 3 - Alpha",
