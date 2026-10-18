@@ -1,0 +1,31 @@
+# Changelog
+
+All notable changes to the `sociahive` Python package are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Fixed
+
+- `sh.posts.bulk` now matches `POST /posts/bulk`: `bulk(action, post_ids, *, scheduled_for=, timezone=, status=)` runs schedule, delete or update_status on up to 50 existing posts and returns the counts. It used to send `{"posts": [...]}`, which the API refuses. **Breaking** for anyone calling the old signature; create posts with `sh.posts.create` instead.
+- `sh.flows.list` requires `platform_user_id`, as the API does.
+- Package contact is support@sociahive.com.
+
+### Added
+
+- `SociaHiveError.retry_after`: seconds from the `Retry-After` header on a 429.
+
+## [0.1.0] - 2026-05-20
+
+First release on PyPI.
+
+### Added
+
+- `SociaHive` client with API key (`X-API-Key`) or OAuth bearer token auth, built on `httpx`, usable as a context manager.
+- `sh.accounts.list`.
+- `sh.posts`: `list`, `get`, `create`, `update`, `schedule`, `publish`, `cancel`, `bulk`.
+- `sh.flows`: `list`, `get`, `create`, `update`, `delete`, `activate`, `deactivate`, `add_node`, `update_node`, `add_edge`, `stats`, `collected_data`, `generate`.
+- `sh.analytics`: `get`, `export`.
+- `SociaHiveError` with `status`, `is_auth_error` and `is_rate_limited`.
+- Python 3.9 or later.
+
+[0.1.0]: https://pypi.org/project/sociahive/0.1.0/

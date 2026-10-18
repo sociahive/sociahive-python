@@ -1,6 +1,6 @@
 """Tests for the ``sh.autopilot`` resource.
 
-These use an ``httpx.MockTransport`` so no network is touched — each test
+These use an ``httpx.MockTransport`` so no network is touched: each test
 captures the outgoing request and asserts the method, path, and JSON body
 the SDK produced, plus the unwrapped response.
 """

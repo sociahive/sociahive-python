@@ -1,4 +1,4 @@
-"""SociaHive client — thin ergonomic wrapper over httpx.
+"""SociaHive client: a thin ergonomic wrapper over httpx.
 
 Mirrors the resource grouping in @sociahive/sdk (Node): ``sh.accounts``,
 ``sh.posts``, ``sh.flows``, ``sh.analytics``, ``sh.autopilot``.
@@ -8,7 +8,7 @@ Auth: pass exactly one of ``api_key`` (long-lived) or ``oauth_token`` (per-user 
 
 from __future__ import annotations
 
-from typing import Any, Iterable, Literal
+from typing import Any, Literal, Sequence
 
 import httpx
 
@@ -42,7 +42,7 @@ class _Accounts(_Resource):
 def _lift_content(payload: dict[str, Any]) -> dict[str, Any]:
     """The v1 ``POST /posts`` endpoint expects ``{ content: { text, media }, ... }``.
     We let SDK callers pass ``text`` and ``media`` at the top level for ergonomics
-    and lift them into the ``content`` envelope here. Idempotent — if the caller
+    and lift them into the ``content`` envelope here. Idempotent: if the caller
     already passed ``content``, we leave their payload alone.
     """
     if "content" in payload:
@@ -96,18 +96,52 @@ class _Posts(_Resource):
     def cancel(self, post_id: str) -> dict[str, Any]:
         return self._client._request("POST", f"/posts/{post_id}/cancel")
 
-    def bulk(self, posts: Iterable[dict[str, Any]]) -> dict[str, Any]:
-        wire = [_lift_content(dict(p)) for p in posts]
-        return self._client._request("POST", "/posts/bulk", json={"posts": wire})
+    def bulk(
+        self,
+        action: Literal["schedule", "delete", "update_status"],
+        post_ids: Sequence[str],
+        *,
+        scheduled_for: str | None = None,
+        timezone: str | None = None,
+        status: Literal["draft", "scheduled"] | None = None,
+    ) -> dict[str, Any]:
+        """Apply one action to up to 50 existing posts.
+
+        - ``action="schedule"`` needs ``scheduled_for`` (ISO 8601); ``timezone``
+          is optional (the API defaults to UTC).
+        - ``action="delete"`` deletes the posts.
+        - ``action="update_status"`` needs ``status`` (``"draft"`` or ``"scheduled"``).
+
+        It does not create posts; call :meth:`create` for each one. Returns
+        ``{"total", "succeeded", "failed", "errors": [{"post_id", "error"}]}``.
+        """
+        ids = list(post_ids)
+        if not 1 <= len(ids) <= 50:
+            raise ValueError("posts.bulk takes 1 to 50 post_ids")
+        if action == "schedule" and not scheduled_for:
+            raise ValueError('action="schedule" needs scheduled_for')
+        if action == "update_status" and not status:
+            raise ValueError('action="update_status" needs status')
+        body: dict[str, Any] = {"action": action, "post_ids": ids}
+        if action == "schedule":
+            body["scheduled_for"] = scheduled_for
+            if timezone:
+                body["timezone"] = timezone
+        if action == "update_status":
+            body["status"] = status
+        return self._client._request("POST", "/posts/bulk", json=body)
 
 
 class _Flows(_Resource):
-    def list(self, *, platform_user_id: str | None = None) -> dict[str, Any]:
+    def list(self, *, platform_user_id: str) -> dict[str, Any]:
+        """List the flows of one connected account. ``platform_user_id`` is
+        required: take it from ``sh.accounts.list()``.
+        """
         # v1 quirk: this endpoint returns `{"flows": [...]}` not `{"data": [...]}`.
         # Normalize so every SDK list call exposes the same `.data` key.
         raw = self._client._request(
             "GET", "/flows",
-            params={"platform_user_id": platform_user_id} if platform_user_id else None,
+            params={"platform_user_id": platform_user_id},
         )
         if isinstance(raw, dict) and "flows" in raw and "data" not in raw:
             items = [_normalize_id(f) for f in (raw.get("flows") or [])]
@@ -212,7 +246,7 @@ class _Flows(_Resource):
 
 
 class _Autopilot(_Resource):
-    """Scheduler Autopilot — weekly AI content generation.
+    """Scheduler Autopilot: weekly AI content generation.
 
     Reads require the ``autopilot:read`` scope; every write method
     (``generate``, ``adjust``, ``update_brand_kit``, ``approve``,
@@ -274,7 +308,7 @@ class _Autopilot(_Resource):
         return self._client._request("PUT", "/autopilot/brand-kit", json=body)
 
     def approve(self, batch_id: str | None = None, *, confirm: bool) -> dict[str, Any]:
-        """Approve this week's batch and schedule it — IRREVERSIBLE go-live.
+        """Approve this week's batch and schedule it. IRREVERSIBLE go-live.
 
         The API rejects the call with ``400 confirmation_required`` unless
         ``confirm=True``. ``confirm`` is a required keyword-only argument to
@@ -293,7 +327,7 @@ class _Autopilot(_Resource):
         account_ids: list[str] | None = None,
         confirm: bool,
     ) -> dict[str, Any]:
-        """Enable autopilot — IRREVERSIBLE.
+        """Enable autopilot. IRREVERSIBLE.
 
         The API rejects the call with ``400 confirmation_required`` unless
         ``confirm=True``. ``confirm`` is a required keyword-only argument.
@@ -342,7 +376,7 @@ class SociaHive:
     Pass exactly one of ``api_key`` or ``oauth_token``::
 
         sh = SociaHive(api_key="sk_...")
-        sh = SociaHive(oauth_token="sh_at_...")
+        sh = SociaHive(oauth_token="mcp_at_...")
     """
 
     def __init__(
@@ -419,14 +453,24 @@ class SociaHive:
                 status=resp.status_code,
                 body=body,
                 code=err.get("error"),
+                retry_after=_retry_after(resp),
             )
         return _unwrap_envelope(body)
+
+
+def _retry_after(resp: httpx.Response) -> float | None:
+    """Seconds from the ``Retry-After`` header, or None when absent or not a number."""
+    try:
+        value = float(resp.headers.get("retry-after", ""))
+    except ValueError:
+        return None
+    return value if value > 0 else None
 
 
 def _unwrap_envelope(body: Any) -> Any:
     """Strip the v1 single-resource ``{"data": {...}}`` envelope so callers see
     the object directly. Paginated lists ``{"data": [...], "pagination": {...}}``
-    are left alone — callers expect both fields. Mirrors Node SDK behaviour.
+    are left alone; callers expect both fields. Mirrors Node SDK behaviour.
     """
     if (
         isinstance(body, dict)
