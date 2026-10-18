@@ -4,6 +4,8 @@ All notable changes to the `sociahive` Python package are listed here. The forma
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-18
+
 ### Fixed
 
 - `sh.posts.bulk` now matches `POST /posts/bulk`: `bulk(action, post_ids, *, scheduled_for=, timezone=, status=)` runs schedule, delete or update_status on up to 50 existing posts and returns the counts. It used to send `{"posts": [...]}`, which the API refuses. **Breaking** for anyone calling the old signature; create posts with `sh.posts.create` instead.
@@ -29,3 +31,4 @@ First release on PyPI.
 - Python 3.9 or later.
 
 [0.1.0]: https://pypi.org/project/sociahive/0.1.0/
+[0.2.0]: https://pypi.org/project/sociahive/0.2.0/

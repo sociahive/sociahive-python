@@ -13,4 +13,4 @@ from .client import SociaHive
 from .errors import SociaHiveError
 
 __all__ = ["SociaHive", "SociaHiveError"]
-__version__ = "0.1.0"
+__version__ = "0.2.0"
