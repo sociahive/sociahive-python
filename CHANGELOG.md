@@ -17,6 +17,7 @@ All notable changes to the `sociahive` Python package are listed here. The forma
 ### Changed
 
 - Platform ids are plain `str`, so a platform added later needs no SDK release.
+- The documented platform ids cover every public platform, including Telegram channels, Discord, Slack, Mastodon, Lemmy, Tumblr, Dev.to, Hashnode, WordPress, Listmonk, Dribbble, Twitch and Kick.
 - `SociaHiveError.code` prefers the server's `code` field and falls back to `error`.
 - Package contact is support@sociahive.com.
 
