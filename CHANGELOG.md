@@ -4,21 +4,26 @@ All notable changes to the `sociahive` Python package are listed here. The forma
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-10-18
+## [0.2.0] - 2026-10-20
+
+### Added
+
+- New resources: `media` (media library, uploads, AI images), `signatures`, `posting_slots` (with `find_slot`), `link_clicks`, `review_links`, `plugs`, `calendar`, `client_invites`, `rss_feeds` and `webhooks`.
+- `posts.delete`, `posts.duplicate` and `analytics.content_insights`.
+- `TypedDict` types generated from the OpenAPI spec, in `sociahive.api`.
+- `verify_webhook_signature` checks the `X-SociaHive-Signature` header of a webhook delivery.
+- `SociaHiveError.retry_after`: seconds from the `Retry-After` header on a 429.
+
+### Changed
+
+- Platform ids are plain `str`, so a platform added later needs no SDK release.
+- `SociaHiveError.code` prefers the server's `code` field and falls back to `error`.
+- Package contact is support@sociahive.com.
 
 ### Fixed
 
 - `sh.posts.bulk` now matches `POST /posts/bulk`: `bulk(action, post_ids, *, scheduled_for=, timezone=, status=)` runs schedule, delete or update_status on up to 50 existing posts and returns the counts. It used to send `{"posts": [...]}`, which the API refuses. **Breaking** for anyone calling the old signature; create posts with `sh.posts.create` instead.
 - `sh.flows.list` requires `platform_user_id`, as the API does.
-- Package contact is support@sociahive.com.
-
-### Added
-
-- `SociaHiveError.retry_after`: seconds from the `Retry-After` header on a 429.
-
-### Removed
-
-- Autopilot methods that were on main but never released; they will return when Autopilot is available to everyone.
 
 ## [0.1.0] - 2026-05-20
 

@@ -1,27 +1,40 @@
 """SociaHive client: a thin ergonomic wrapper over httpx.
 
 Mirrors the resource grouping in @sociahive/sdk (Node): ``sh.accounts``,
-``sh.posts``, ``sh.flows``, ``sh.analytics``.
+``sh.posts``, ``sh.flows``, ``sh.analytics`` and the scheduler resources in
+``resources.py`` (``sh.media``, ``sh.signatures``, ``sh.posting_slots``,
+``sh.review_links``, ``sh.plugs``, ``sh.link_clicks``, ``sh.calendar``,
+``sh.client_invites``, ``sh.rss_feeds``, ``sh.webhooks``).
 
 Auth: pass exactly one of ``api_key`` (long-lived) or ``oauth_token`` (per-user OAuth).
 """
 
 from __future__ import annotations
 
-from typing import Any, Literal, Sequence
+from typing import Any, Iterable, Literal, Sequence
 
 import httpx
 
 from .errors import SociaHiveError
+from .resources import (
+    Calendar,
+    ClientInvites,
+    LinkClicks,
+    Media,
+    Plugs,
+    PostingSlots,
+    ReviewLinks,
+    RssFeeds,
+    Signatures,
+    Webhooks,
+)
 
 DEFAULT_BASE_URL = "https://www.sociahive.com/api/v1"
 DEFAULT_TIMEOUT = 30.0
 
-Platform = Literal[
-    "instagram", "facebook", "messenger", "whatsapp",
-    "linkedin", "twitter", "tiktok", "telegram",
-    "threads", "youtube", "bluesky", "pinterest",
-]
+# Platform ids are plain strings: the public spec lists only public platforms,
+# and a new platform must not need an SDK release.
+Platform = str
 
 
 class _Resource:
@@ -95,6 +108,13 @@ class _Posts(_Resource):
 
     def cancel(self, post_id: str) -> dict[str, Any]:
         return self._client._request("POST", f"/posts/{post_id}/cancel")
+
+    def delete(self, post_id: str) -> None:
+        self._client._request("DELETE", f"/posts/{post_id}")
+
+    def duplicate(self, post_id: str) -> dict[str, Any]:
+        """Copy a post as a new draft."""
+        return self._client._request("POST", f"/posts/{post_id}/duplicate")
 
     def bulk(
         self,
@@ -271,6 +291,10 @@ class _Analytics(_Resource):
             "type": type, "format": format, "from": from_, "to": to,
         })
 
+    def content_insights(self, *, weeks: int | None = None) -> dict[str, Any]:
+        """What has worked on your published posts over the last ``weeks`` (1 to 12)."""
+        return self._client._request_data("GET", "/analytics/content-insights", params={"weeks": weeks})
+
 
 class SociaHive:
     """Main entry point. Construct once, reuse for many calls.
@@ -278,7 +302,7 @@ class SociaHive:
     Pass exactly one of ``api_key`` or ``oauth_token``::
 
         sh = SociaHive(api_key="sk_...")
-        sh = SociaHive(oauth_token="mcp_at_...")
+        sh = SociaHive(oauth_token="sh_at_...")
     """
 
     def __init__(
@@ -288,6 +312,7 @@ class SociaHive:
         base_url: str = DEFAULT_BASE_URL,
         timeout: float = DEFAULT_TIMEOUT,
         client: httpx.Client | None = None,
+        upload_client: httpx.Client | None = None,
     ) -> None:
         if not (bool(api_key) ^ bool(oauth_token)):
             raise ValueError("Pass exactly one of `api_key` or `oauth_token`")
@@ -302,13 +327,26 @@ class SociaHive:
             headers=headers,
             timeout=timeout,
         )
+        # A separate client without the auth headers, for presigned storage URLs.
+        self._upload_http = upload_client or httpx.Client(timeout=timeout)
         self.accounts = _Accounts(self)
         self.posts = _Posts(self)
         self.flows = _Flows(self)
         self.analytics = _Analytics(self)
+        self.media = Media(self)
+        self.signatures = Signatures(self)
+        self.posting_slots = PostingSlots(self)
+        self.review_links = ReviewLinks(self)
+        self.plugs = Plugs(self)
+        self.link_clicks = LinkClicks(self)
+        self.calendar = Calendar(self)
+        self.client_invites = ClientInvites(self)
+        self.rss_feeds = RssFeeds(self)
+        self.webhooks = Webhooks(self)
 
     def close(self) -> None:
         self._http.close()
+        self._upload_http.close()
 
     def __enter__(self) -> "SociaHive":
         return self
@@ -317,6 +355,28 @@ class SociaHive:
         self.close()
 
     # ── internal ────────────────────────────────────────────────────
+
+    def _request_data(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: dict[str, Any] | None = None,
+        json: Any = None,
+    ) -> Any:
+        """Like ``_request`` but also unwraps ``{"data": [...]}`` lists."""
+        body = self._request(method, path, params=params, json=json)
+        if isinstance(body, dict) and "data" in body and "pagination" not in body:
+            return _normalize_id(body["data"])
+        return body
+
+    def _put_bytes(self, url: str, data: bytes, headers: dict[str, str]) -> int:
+        """PUT to a presigned storage URL. The API key is never sent there."""
+        try:
+            resp = self._upload_http.put(url, content=data, headers=headers)
+        except httpx.RequestError as exc:
+            raise SociaHiveError(f"Upload failed: {exc}", status=0, code="upload_failed") from exc
+        return resp.status_code
 
     def _request(
         self,
@@ -349,23 +409,20 @@ class SociaHive:
 
         if not resp.is_success:
             err = body if isinstance(body, dict) else {"error": body}
+            retry_after: float | None = None
+            try:
+                parsed = float(resp.headers.get("retry-after", ""))
+                retry_after = parsed if parsed > 0 else None
+            except ValueError:
+                retry_after = None
             raise SociaHiveError(
                 err.get("error_description") or err.get("error") or f"HTTP {resp.status_code}",
                 status=resp.status_code,
                 body=body,
-                code=err.get("error"),
-                retry_after=_retry_after(resp),
+                code=err.get("code") or err.get("error"),
+                retry_after=retry_after,
             )
         return _unwrap_envelope(body)
-
-
-def _retry_after(resp: httpx.Response) -> float | None:
-    """Seconds from the ``Retry-After`` header, or None when absent or not a number."""
-    try:
-        value = float(resp.headers.get("retry-after", ""))
-    except ValueError:
-        return None
-    return value if value > 0 else None
 
 
 def _unwrap_envelope(body: Any) -> Any:

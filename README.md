@@ -26,7 +26,7 @@
 
 # sociahive
 
-Official Python SDK for the [SociaHive](https://www.sociahive.com) API: schedule and publish posts, build and run DM and comment automations and read analytics from your own code.
+Official Python SDK for the [SociaHive](https://www.sociahive.com) API: schedule and publish posts, manage your media library, posting slots, signatures, client review links and plugs, build and run DM and comment automations, receive webhooks and read analytics from your own code.
 
 API access is part of the 7-day trial and every paid plan. On the free plan the API answers `403 upgrade_required`.
 
@@ -111,12 +111,55 @@ sh.posts.bulk("delete", ["p4"])
 
 ## What's covered
 
-| Domain | Methods |
+| Resource | Methods |
 |---|---|
 | `sh.accounts` | `list` |
-| `sh.posts` | `list`, `get`, `create`, `update`, `schedule`, `publish`, `cancel`, `bulk` |
+| `sh.posts` | `list`, `get`, `create`, `update`, `delete`, `schedule`, `publish`, `cancel`, `bulk`, `duplicate` |
+| `sh.media` | `list` (media library), `upload` (presign, PUT and verify in one call), `presign`, `verify`, `upload_from_url`, `generate_image`, `image_allowance` |
+| `sh.signatures` | `list`, `create`, `update`, `delete` |
+| `sh.posting_slots` | `list`, `create`, `update`, `delete`, `occurrences`, `find_slot` |
+| `sh.link_clicks` | `get` |
+| `sh.review_links` | `list`, `create`, `revoke` |
+| `sh.plugs` | `list`, `arm`, `delete` |
+| `sh.calendar` | `month`, `duplicate`, `stats` |
+| `sh.client_invites` | `list`, `create`, `revoke` |
+| `sh.rss_feeds` | `list`, `create`, `update`, `pause` |
+| `sh.webhooks` | `list`, `create`, `update`, `delete` |
 | `sh.flows` | `list`, `get`, `create`, `update`, `delete`, `activate`, `deactivate`, `add_node`, `update_node`, `add_edge`, `stats`, `collected_data`, `generate` |
-| `sh.analytics` | `get`, `export` |
+| `sh.analytics` | `get`, `export`, `content_insights` |
+
+Some features depend on your plan: client review links, client invites and AI images need Studio or above, plugs need Creator or above. On a plan without the feature its calls raise `SociaHiveError` with `status == 403`.
+
+Schedule into the next free posting slot:
+
+```python
+slot = sh.posting_slots.find_slot(account_ids=[account_id])
+sh.posts.create(
+    text="New arrivals are in",
+    platforms=[{"platform": "instagram", "account_id": account_id}],
+    schedule_type="scheduled",
+    scheduled_at=slot["at"],
+    timezone=slot["timezone"],
+)
+```
+
+## Types
+
+Return values are `TypedDict`s generated from SociaHive's OpenAPI document, in
+`sociahive.api` (for example `api.FreeSlot`, `api.MediaLibraryPage`). Platform
+ids are plain `str`, so a platform added later needs no SDK release.
+
+## Webhooks
+
+`sh.webhooks.create(target_url=..., events=[...])` subscribes an HTTPS endpoint.
+`verify_webhook_signature` checks the `X-SociaHive-Signature` header of a
+delivery (HMAC-SHA256 with a five-minute replay window):
+
+```python
+from sociahive import verify_webhook_signature
+
+ok = verify_webhook_signature(body=raw_body, signature=headers["X-SociaHive-Signature"], secret=secret)
+```
 
 ## Platforms
 
@@ -133,6 +176,8 @@ sh.posts.bulk("delete", ["p4"])
   <a href="https://www.sociahive.com/features/content-scheduler"><img src="https://raw.githubusercontent.com/sociahive/.github/main/assets/platforms/bluesky.svg" alt="Bluesky" title="Bluesky" width="24"></a>&nbsp;&nbsp;
   <a href="https://www.sociahive.com/features/content-scheduler"><img src="https://raw.githubusercontent.com/sociahive/.github/main/assets/platforms/pinterest.svg" alt="Pinterest" title="Pinterest" width="24"></a>
 </p>
+
+<p align="center">Also Telegram channels, Discord, Mastodon, Lemmy, Dev.to, Hashnode, WordPress and Listmonk.</p>
 
 ### Automate DMs and comments on
 
