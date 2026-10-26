@@ -15,4 +15,4 @@ from .errors import SociaHiveError
 from .webhooks import verify_webhook_signature
 
 __all__ = ["SociaHive", "SociaHiveError", "api", "verify_webhook_signature"]
-__version__ = "0.2.0"
+__version__ = "0.2.1"

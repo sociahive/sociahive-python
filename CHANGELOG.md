@@ -4,6 +4,12 @@ All notable changes to the `sociahive` Python package are listed here. The forma
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-26
+
+### Changed
+
+- Releases are published from GitHub Actions through PyPI trusted publishing. No code changes.
+
 ## [0.2.0] - 2026-10-20
 
 ### Added
