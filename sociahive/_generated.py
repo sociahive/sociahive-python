@@ -20,6 +20,7 @@ class ConnectedAccount(TypedDict, total=False):
     is_active: bool
     created_at: str
     text_limit: int
+    reconnect_to_publish: bool
 
 
 class PostAutomationDTO(TypedDict, total=False):
@@ -126,10 +127,28 @@ class FlowEnvelope(TypedDict, total=False):
     flow: Dict[str, Any]
 
 
+class FlowPendingAuthor(TypedDict, total=False):
+    kind: Literal["user", "agent", "api"]
+    surface: str
+    userId: str
+
+
+class FlowPendingSummary(TypedDict, total=False):
+    """Unpublished changes of a live flow (published or paused)."""
+    rev: str
+    base_v: int
+    updatedAt: str
+    by: "FlowPendingAuthor"
+    liveChanged: bool
+
+
 class FlowGraphEnvelope(TypedDict, total=False):
     flow: Dict[str, Any]
     nodes: List[Dict[str, Any]]
     edges: List[Dict[str, Any]]
+    pending: "FlowPendingSummary"
+    target: Literal["live", "pending"]
+    legacyFormat: bool
 
 
 class FlowUpdateEnvelope(TypedDict, total=False):
@@ -189,6 +208,34 @@ class CreateFlowRequest(TypedDict, total=False):
     trigger: Dict[str, Any]
 
 
+class FlowPendingChanges(TypedDict, total=False):
+    """What publishing the unpublished changes would change."""
+    rev: str
+    token: str
+    baseV: int
+    liveChanged: bool
+    added: List[Dict[str, Any]]
+    removed: List[Dict[str, Any]]
+    changed: List[Dict[str, Any]]
+    edgesChanged: bool
+    triggerChanged: bool
+    midFlowInRemovedSteps: int
+    createdBy: "FlowPendingAuthor"
+    lastBy: "FlowPendingAuthor"
+    createdAt: str
+    updatedAt: str
+
+
+class FlowPendingPublished(TypedDict, total=False):
+    flow: Dict[str, Any]
+    undo: Union[Dict[str, Any], None]
+
+
+class FlowPendingDiscarded(TypedDict, total=False):
+    discarded: Any
+    revisionId: Union[str, None]
+
+
 class ContentInsights(TypedDict, total=False):
     """What has worked on your published posts: format, weekday and pillar compared with your average."""
     version: str
@@ -240,6 +287,7 @@ class Device(TypedDict, total=False):
     app_version: str
     locale: str
     apns_environment: Literal["production", "sandbox"]
+    push_schema: int
     last_seen_at: str
     created_at: str
 
@@ -250,11 +298,12 @@ class RegisterDeviceRequest(TypedDict, total=False):
     app_version: str
     locale: str
     apns_environment: Literal["production", "sandbox"]
+    push_schema: int
 
 
 class PresignUploadRequest(TypedDict, total=False):
     filename: str
-    mime_type: Literal["image/jpeg", "image/png", "image/webp", "video/mp4", "video/quicktime"]
+    mime_type: Literal["image/jpeg", "image/png", "image/webp", "video/mp4", "video/quicktime", "application/pdf"]
     size_bytes: int
 
 
@@ -287,7 +336,7 @@ class UploadFromUrlResponse(TypedDict, total=False):
     url: str
     key: str
     size_bytes: int
-    mime_type: Literal["image/jpeg", "image/png", "image/webp", "video/mp4", "video/quicktime"]
+    mime_type: Literal["image/jpeg", "image/png", "image/webp", "video/mp4", "video/quicktime", "application/pdf"]
 
 
 class RegisterActivityRequest(TypedDict, total=False):
@@ -319,6 +368,8 @@ class MeFeedResponse(TypedDict, total=False):
     unread_inbox_count: int
     error_count_24h: int
     account_health: List["MeFeedAccountHealth"]
+    approvals_waiting: int
+    approvals_waiting_capped: bool
     generated_at: str
     cached: bool
 

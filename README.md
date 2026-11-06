@@ -109,6 +109,25 @@ sh.posts.bulk("update_status", ["p3"], status="draft")
 sh.posts.bulk("delete", ["p4"])
 ```
 
+## Unpublished changes of a live flow
+
+Edits to a live flow (published or paused) wait as unpublished changes while
+people keep getting the live version. Preview them, then publish or discard:
+
+```python
+changes = sh.flows.pending(flow_id)
+print(changes["added"], changes["removed"], changes["changed"], changes["midFlowInRemovedSteps"])
+
+# Publish exactly what you previewed. Newer edits raise 409 `pending_changed`.
+result = sh.flows.publish_changes(flow_id, expected_rev=changes["rev"])
+
+# Or drop them; the live version stays as it is.
+sh.flows.discard_changes(flow_id, expected_rev=changes["rev"])
+```
+
+`sh.flows.list()` items carry `hasPendingChanges`, and
+`sh.flows.get(flow_id, version="pending")` returns the unpublished graph.
+
 ## What's covered
 
 | Resource | Methods |
@@ -125,7 +144,7 @@ sh.posts.bulk("delete", ["p4"])
 | `sh.client_invites` | `list`, `create`, `revoke` |
 | `sh.rss_feeds` | `list`, `create`, `update`, `pause` |
 | `sh.webhooks` | `list`, `create`, `update`, `delete` |
-| `sh.flows` | `list`, `get`, `create`, `update`, `delete`, `activate`, `deactivate`, `add_node`, `update_node`, `add_edge`, `stats`, `collected_data`, `generate` |
+| `sh.flows` | `list`, `get`, `create`, `update`, `delete`, `activate`, `deactivate`, `add_node`, `update_node`, `add_edge`, `stats`, `collected_data`, `generate`, `pending`, `publish_changes`, `discard_changes` |
 | `sh.analytics` | `get`, `export`, `content_insights` |
 
 Some features depend on your plan: client review links, client invites and AI images need Studio or above, plugs need Creator or above. On a plan without the feature its calls raise `SociaHiveError` with `status == 403`.

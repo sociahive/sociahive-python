@@ -86,6 +86,9 @@ CASES: list[tuple[str, Callable[[SociaHive], Any], str, dict[str, str], Any]] = 
     ("POST /rss-feeds", lambda sh: sh.rss_feeds.create(url="https://b.test/feed"), "/rss-feeds", {}, {"url": "https://b.test/feed"}),
     ("PATCH /rss-feeds/{id}", lambda sh: sh.rss_feeds.update(ID, daily_cap=2), f"/rss-feeds/{ID}", {}, {"daily_cap": 2}),
     ("POST /rss-feeds/{id}/pause", lambda sh: sh.rss_feeds.pause(ID, False), f"/rss-feeds/{ID}/pause", {}, {"paused": False}),
+    ("GET /flows/{id}/pending", lambda sh: sh.flows.pending(ID), f"/flows/{ID}/pending", {}, None),
+    ("POST /flows/{id}/pending/publish", lambda sh: sh.flows.publish_changes(ID, expected_rev="f1:3"), f"/flows/{ID}/pending/publish", {}, {"expectedRev": "f1:3"}),
+    ("POST /flows/{id}/pending/discard", lambda sh: sh.flows.discard_changes(ID, expected_rev="f1:3"), f"/flows/{ID}/pending/discard", {}, {"expectedRev": "f1:3"}),
     ("GET /webhooks", lambda sh: sh.webhooks.list(), "/webhooks", {}, None),
     ("POST /webhooks", lambda sh: sh.webhooks.create(target_url="https://n8n.test/h", events=["post.published"]), "/webhooks", {}, {"target_url": "https://n8n.test/h", "events": ["post.published"]}),
     ("PATCH /webhooks/{id}", lambda sh: sh.webhooks.update(ID, active=False), f"/webhooks/{ID}", {}, {"active": False}),
@@ -145,6 +148,74 @@ class ContractTest(unittest.TestCase):
         self.assertEqual(dict(calls[0].url.params), {"platform_user_id": "17841400000000000"})
         self.assertEqual(out["data"][0]["id"], ID)
 
+    def test_flows_list_marks_unpublished_changes(self) -> None:
+        sh, _ = make(lambda r: httpx.Response(200, json={"flows": [
+            {"_id": ID, "status": "published", "pending_meta": {"rev": 3}},
+            {"_id": ID2, "status": "published"},
+        ]}))
+        out = sh.flows.list(platform_user_id="17841400000000000")
+        self.assertEqual([f["hasPendingChanges"] for f in out["data"]], [True, False])
+
+    def test_flows_get_pending_version(self) -> None:
+        pending = {"rev": "f1:3", "base_v": 2, "updatedAt": "2026-11-05T10:00:00.000Z",
+                   "by": {"kind": "api", "surface": "api", "userId": "u1"}, "liveChanged": False}
+        sh, calls = make(lambda r: httpx.Response(200, json={
+            "flow": {"_id": ID, "status": "published"}, "nodes": [{"_id": "n1", "type": "message"}],
+            "edges": [], "pending": pending, "target": "pending",
+        }))
+        out = sh.flows.get(ID, version="pending")
+        self.assertEqual(calls[0].method, "GET")
+        self.assertEqual(calls[0].url.path, f"/api/v1/flows/{ID}")
+        self.assertEqual(dict(calls[0].url.params), {"version": "pending"})
+        self.assertEqual(out["id"], ID)
+        self.assertEqual(out["nodes"][0]["id"], "n1")
+        self.assertEqual(out["pending"], pending)
+        self.assertEqual(out["target"], "pending")
+
+    def test_flows_get_live_version_unchanged(self) -> None:
+        sh, calls = make(lambda r: httpx.Response(200, json={"flow": {"_id": ID}, "nodes": [], "edges": []}))
+        out = sh.flows.get(ID)
+        self.assertEqual(dict(calls[0].url.params), {})
+        self.assertNotIn("pending", out)
+        sh, _ = make(lambda r: httpx.Response(200, json={"flow": {"_id": ID}, "nodes": [], "edges": [], "pending": None}))
+        self.assertIsNone(sh.flows.get(ID, version="pending")["pending"])
+
+    def test_flows_pending_returns_the_preview(self) -> None:
+        preview = {
+            "rev": "f1:3", "token": "f1:3", "baseV": 2, "liveChanged": False,
+            "added": [{"id": "n2", "name": "Send link", "type": "message"}], "removed": [], "changed": [],
+            "edgesChanged": True, "triggerChanged": False, "midFlowInRemovedSteps": 0,
+            "createdBy": {"kind": "api", "surface": "api", "userId": "u1"},
+            "createdAt": "2026-11-05T09:00:00.000Z", "updatedAt": "2026-11-05T10:00:00.000Z",
+        }
+        sh, _ = make(lambda r: httpx.Response(200, json=preview))
+        self.assertEqual(sh.flows.pending(ID), preview)
+
+    def test_flows_publish_changes(self) -> None:
+        sh, calls = make(lambda r: httpx.Response(200, json={
+            "flow": {"_id": ID, "status": "published"}, "undo": {"token": "u1", "expiresAtMs": 1793000000000},
+        }))
+        out = sh.flows.publish_changes(ID, expected_rev="f1:3")
+        self.assertEqual(calls[0].method, "POST")
+        self.assertEqual(out["flow"]["id"], ID)
+        self.assertEqual(out["undo"], {"token": "u1", "expiresAtMs": 1793000000000})
+        sh, calls = make()
+        with self.assertRaises(ValueError):
+            sh.flows.publish_changes(ID, expected_rev="")
+        self.assertEqual(calls, [])
+        sh, _ = make(lambda r: httpx.Response(409, json={"error": "The unpublished changes changed", "code": "pending_changed"}))
+        with self.assertRaises(SociaHiveError) as ctx:
+            sh.flows.publish_changes(ID, expected_rev="f1:2")
+        self.assertEqual((ctx.exception.status, ctx.exception.code), (409, "pending_changed"))
+
+    def test_flows_discard_changes_without_rev(self) -> None:
+        sh, calls = make(lambda r: httpx.Response(200, json={"discarded": True, "revisionId": ID2}))
+        out = sh.flows.discard_changes(ID)
+        self.assertEqual(calls[0].method, "POST")
+        self.assertEqual(calls[0].url.path, f"/api/v1/flows/{ID}/pending/discard")
+        self.assertEqual(json.loads(calls[0].content), {})
+        self.assertEqual(out, {"discarded": True, "revisionId": ID2})
+
     def test_bulk_checks_its_input_before_sending(self) -> None:
         sh, calls = make()
         with self.assertRaises(ValueError):
@@ -192,7 +263,7 @@ class ContractTest(unittest.TestCase):
         if not generated.exists():
             self.skipTest("run inside the monorepo")
         keys = re.findall(r'^  "((?:GET|POST|PUT|PATCH|DELETE) /[^"]*)": \{', generated.read_text(), re.M)
-        program = re.compile(r"^(GET|POST|PUT|PATCH|DELETE) /(media-library|media/|uploads/|signatures|posting-slots|find-slot|client-invites|rss-feeds|calendar|webhooks|connected-accounts$|analytics|posts(/bulk|/\{id\}(/(schedule|publish|cancel|duplicate|link-clicks|review-links|plugs))?)?$)")
+        program = re.compile(r"^(GET|POST|PUT|PATCH|DELETE) /(media-library|media/|uploads/|signatures|posting-slots|find-slot|client-invites|rss-feeds|calendar|webhooks|connected-accounts$|analytics|posts(/bulk|/\{id\}(/(schedule|publish|cancel|duplicate|link-clicks|review-links|plugs))?)?$|flows/\{id\}/pending)")
         covered = {c[0] for c in CASES}
         self.assertEqual([k for k in keys if program.match(k) and k not in covered], [])
 
@@ -213,6 +284,8 @@ class GeneratedTypesTest(unittest.TestCase):
 
         self.assertIn("next_cursor", api.MediaLibraryPage.__annotations__)
         self.assertIn("slot_id", api.FreeSlot.__annotations__)
+        self.assertIn("midFlowInRemovedSteps", api.FlowPendingChanges.__annotations__)
+        self.assertIn("pending", api.FlowGraphEnvelope.__annotations__)
 
 
 if __name__ == "__main__":

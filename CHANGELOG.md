@@ -4,6 +4,18 @@ All notable changes to the `sociahive` Python package are listed here. The forma
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-05
+
+### Added
+
+- Unpublished changes of a live flow. Edits to a published or paused flow wait as unpublished changes while people keep getting the live version.
+  - `sh.flows.pending(flow_id)` previews what publishing them would change: steps added, removed and changed, and how many people are partway through a removed step.
+  - `sh.flows.publish_changes(flow_id, expected_rev=...)` publishes them with the same checks as turning a flow on, and returns the flow and an `undo` token.
+  - `sh.flows.discard_changes(flow_id, expected_rev=None)` drops them; the live version is unchanged.
+  - `sh.flows.get(flow_id, version="pending")` returns the unpublished version of the graph, with `pending` (its `rev`, or `None` when there are none) and `target`.
+  - `sh.flows.list()` items carry `hasPendingChanges`.
+- Generated types: `FlowPendingChanges`, `FlowPendingPublished`, `FlowPendingDiscarded`, `FlowPendingSummary`, and the other fields the API added since 0.2.1 (for example `reconnect_to_publish` on connected accounts and PDF uploads for flow messages).
+
 ## [0.2.1] - 2026-10-26
 
 ### Changed
@@ -48,3 +60,4 @@ First release on PyPI.
 
 [0.1.0]: https://pypi.org/project/sociahive/0.1.0/
 [0.2.0]: https://pypi.org/project/sociahive/0.2.0/
+[0.3.0]: https://pypi.org/project/sociahive/0.3.0/
