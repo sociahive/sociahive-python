@@ -164,7 +164,7 @@ class _Flows(_Resource):
             params={"platform_user_id": platform_user_id},
         )
         if isinstance(raw, dict) and "flows" in raw and "data" not in raw:
-            items = [_normalize_id(f) for f in (raw.get("flows") or [])]
+            items = [_with_pending_flag(_normalize_id(f)) for f in (raw.get("flows") or [])]
             return {"data": items, "pagination": raw.get("pagination") or {
                 "limit": len(items), "offset": 0, "total": len(items),
             }}
@@ -173,22 +173,72 @@ class _Flows(_Resource):
         # want to normalize each item's id.
         if isinstance(raw, dict) and isinstance(raw.get("data"), list):
             raw = dict(raw)
-            raw["data"] = [_normalize_id(f) for f in raw["data"]]
+            raw["data"] = [_with_pending_flag(_normalize_id(f)) for f in raw["data"]]
         return raw
 
-    def get(self, flow_id: str) -> dict[str, Any]:
+    def get(self, flow_id: str, *, version: Literal["pending"] | None = None) -> dict[str, Any]:
+        """A flow with its nodes and edges. By default the live version; with
+        ``version="pending"``, the unpublished changes of a live flow (the live
+        version when there are none), plus ``pending`` (``None`` when there are
+        none) and ``target``.
+        """
         # v1 quirk: this endpoint returns `{"flow": {...}, "nodes": [...], "edges": [...]}`
         # instead of the standard envelope. Merge into one object so callers see
         # `result["id"]`, `result["nodes"]`, etc. like every other resource.
-        raw = self._client._request("GET", f"/flows/{flow_id}")
+        raw = self._client._request(
+            "GET", f"/flows/{flow_id}",
+            params={"version": version} if version else None,
+        )
         if isinstance(raw, dict) and "flow" in raw and isinstance(raw.get("flow"), dict):
             flow = _normalize_id(raw["flow"])
-            return {
+            out = {
                 **flow,
                 "nodes": [_normalize_id(n) for n in (raw.get("nodes") or [])],
                 "edges": [_normalize_id(e) for e in (raw.get("edges") or [])],
             }
+            for key in ("pending", "target", "legacyFormat"):
+                if key in raw:
+                    out[key] = raw[key]
+            return out
         return raw
+
+    def pending(self, flow_id: str) -> dict[str, Any]:
+        """What publishing a live flow's unpublished changes would change: steps
+        added, removed and changed, and how many people are partway through a
+        removed step. Raises ``SociaHiveError`` 404 ``no_pending_changes`` when
+        there are none.
+        """
+        return self._client._request("GET", f"/flows/{flow_id}/pending")
+
+    def publish_changes(self, flow_id: str, *, expected_rev: str) -> dict[str, Any]:
+        """Publish a live flow's unpublished changes, with the same checks as
+        turning a flow on. ``expected_rev`` is the ``rev`` from :meth:`pending`:
+        newer edits raise 409 ``pending_changed``, a live version that changed
+        since 409 ``live_changed``. A failed check is a 400 with the check's
+        ``code`` and the step's ``nodeId`` in ``err.body``.
+
+        Returns ``{"flow": {...}, "undo": {"token", "expiresAtMs"} | None}``.
+        """
+        if not expected_rev:
+            raise ValueError("flows.publish_changes needs expected_rev (the `rev` from flows.pending)")
+        out = self._client._request(
+            "POST", f"/flows/{flow_id}/pending/publish",
+            json={"expectedRev": expected_rev},
+        )
+        if isinstance(out, dict) and isinstance(out.get("flow"), dict):
+            out = {**out, "flow": _normalize_id(out["flow"])}
+        return out
+
+    def discard_changes(self, flow_id: str, *, expected_rev: str | None = None) -> dict[str, Any]:
+        """Drop a live flow's unpublished changes; the live version is unchanged.
+        With ``expected_rev``, newer edits raise 409 ``pending_changed``.
+
+        Returns ``{"discarded": True, "revisionId": str | None}``.
+        """
+        return self._client._request(
+            "POST", f"/flows/{flow_id}/pending/discard",
+            json={"expectedRev": expected_rev} if expected_rev else {},
+        )
 
     def create(self, **kwargs: Any) -> dict[str, Any]:
         return self._client._request("POST", "/flows", json=kwargs)
@@ -440,6 +490,15 @@ def _unwrap_envelope(body: Any) -> Any:
     if isinstance(body, dict):
         return _normalize_id(body)
     return body
+
+
+def _with_pending_flag(flow: Any) -> Any:
+    """Add ``hasPendingChanges`` to a listed flow: the server marks a live flow
+    that has unpublished changes with ``pending_meta``.
+    """
+    if not isinstance(flow, dict):
+        return flow
+    return {**flow, "hasPendingChanges": flow.get("pending_meta") is not None}
 
 
 def _normalize_id(value: Any) -> Any:

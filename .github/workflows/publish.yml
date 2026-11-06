@@ -1,4 +1,4 @@
-# Publishes the sociahive package to PyPI when a version tag (v0.2.1) is pushed.
+# Publishes the sociahive package to PyPI when a version tag (v0.3.0) is pushed.
 # Uses PyPI trusted publishing (OIDC), so no PyPI token is stored here.
 
 name: Publish
