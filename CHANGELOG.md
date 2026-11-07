@@ -4,6 +4,15 @@ All notable changes to the `sociahive` Python package are listed here. The forma
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-07
+
+### Added
+
+- `sh.approvals`: `list` (posts waiting for your approval), `get`, `approve`, `request_changes` and `undo`. `approve` returns the whole response, because `undo` (a `batch_id`, valid 30 seconds) sits next to `data`. Send `content_hash` from `list` or `get` so a post edited since is refused instead of approved.
+- `sh.comments`: `list`, `add` (team or client visibility, replies with `parent_id`), `resolve`, `inbox` and `mark_seen`.
+- `sh.notifications`: `matrix`, `update_matrix`, `mute_client` and `unmute_client`.
+- TypedDicts for these endpoints in `sociahive.api` (`WaitingApproval`, `ApprovalView`, `PostComment`, `PostCommentThreads`, `CommentsInboxItem`, `NotificationMatrixPatch` and others).
+
 ## [0.3.0] - 2026-11-05
 
 ### Added

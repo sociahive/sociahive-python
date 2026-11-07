@@ -240,3 +240,94 @@ class Webhooks(_Base):
 
     def delete(self, webhook_id: str) -> None:
         self._data("DELETE", f"/webhooks/{_seg(webhook_id)}")
+
+
+def _drop_none(body: dict[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in body.items() if v is not None}
+
+
+class Approvals(_Base):
+    """Approval steps: posts waiting for you, and the decision on the current step.
+    An approved post goes out at its scheduled time."""
+
+    def list(
+        self, *,
+        scope: Literal["assigned", "managed"] | None = None,
+        group_id: str | None = None,
+        limit: int | None = None,
+        cursor: str | None = None,
+    ) -> dict[str, Any]:
+        """Posts waiting for your approval: ``items``, ``next_cursor``, ``truncated``."""
+        return self._data("GET", "/approvals", params={"scope": scope, "group_id": group_id, "limit": limit, "cursor": cursor})
+
+    def get(self, post_id: str) -> api.ApprovalView:
+        return self._data("GET", f"/approvals/{_seg(post_id)}")
+
+    def approve(
+        self, post_id: str, *,
+        comment: str | None = None,
+        content_hash: str | None = None,
+        step_index: int | None = None,
+    ) -> dict[str, Any]:
+        """Approve the current step. Send ``content_hash`` (from ``list`` or ``get``) so a post
+        edited since is refused. Returns the whole body: ``undo`` (a ``batch_id``, valid
+        30 seconds) sits next to ``data`` when Approve can be undone."""
+        return self._client._request("POST", f"/approvals/{_seg(post_id)}/decision", json=_drop_none({
+            "decision": "approved", "comment": comment, "content_hash": content_hash, "step_index": step_index,
+        }))
+
+    def request_changes(self, post_id: str, *, comment: str, content_hash: str | None = None) -> api.ApprovalView:
+        return self._data("POST", f"/approvals/{_seg(post_id)}/request-changes", json=_drop_none({
+            "comment": comment, "content_hash": content_hash,
+        }))
+
+    def undo(self, batch_id: str) -> dict[str, Any]:
+        """Undo an Approve within 30 seconds, with the ``batch_id`` from its ``undo``."""
+        return self._data("POST", "/approvals/undo", json={"batch_id": batch_id})
+
+
+class Comments(_Base):
+    """Comments on a post, for your team or visible to your client."""
+
+    def list(self, post_id: str) -> api.PostCommentThreads:
+        return self._data("GET", f"/comments/{_seg(post_id)}")
+
+    def add(
+        self, post_id: str, *,
+        body: str,
+        visibility: Literal["team", "client"] | None = None,
+        parent_id: str | None = None,
+        **kwargs: Any,
+    ) -> api.PostComment:
+        """Add a comment, or a reply with ``parent_id``. ``visibility="client"`` shows it on the review page."""
+        return self._data("POST", f"/comments/{_seg(post_id)}", json=_drop_none({
+            "body": body, "visibility": visibility, "parent_id": parent_id, **kwargs,
+        }))
+
+    def resolve(self, post_id: str, comment_id: str) -> dict[str, Any]:
+        return self._data("POST", f"/comments/{_seg(post_id)}/{_seg(comment_id)}/resolve")
+
+    def inbox(self, *, limit: int | None = None, cursor: str | None = None) -> dict[str, Any]:
+        """Open threads on posts you own, review or are mentioned in: ``items``, ``next_cursor``."""
+        return self._data("GET", "/comments/inbox", params={"limit": limit, "cursor": cursor})
+
+    def mark_seen(self, post_id: str, thread_id: str | None = None) -> dict[str, Any]:
+        return self._data("POST", "/comments/inbox/seen", json=_drop_none({"post_id": post_id, "thread_id": thread_id}))
+
+
+class Notifications(_Base):
+    """Which notices reach you on which channel, and muted clients."""
+
+    def matrix(self) -> dict[str, Any]:
+        return self._data("GET", "/me/notification-matrix")
+
+    def update_matrix(self, **patch: Any) -> dict[str, Any]:
+        """Change some cells; the rest stay as they are."""
+        return self._data("PATCH", "/me/notification-matrix", json=patch)
+
+    def mute_client(self, group_id: str, *, until: str | None = None) -> dict[str, Any]:
+        """No notices about one client (an account group) until ``until``, or until unmuted."""
+        return self._data("POST", "/me/notification-matrix/mutes", json=_drop_none({"group_id": group_id, "until": until}))
+
+    def unmute_client(self, group_id: str) -> dict[str, Any]:
+        return self._data("DELETE", "/me/notification-matrix/mutes", params={"group_id": group_id})

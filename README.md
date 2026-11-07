@@ -144,6 +144,9 @@ sh.flows.discard_changes(flow_id, expected_rev=changes["rev"])
 | `sh.client_invites` | `list`, `create`, `revoke` |
 | `sh.rss_feeds` | `list`, `create`, `update`, `pause` |
 | `sh.webhooks` | `list`, `create`, `update`, `delete` |
+| `sh.approvals` | `list`, `get`, `approve`, `request_changes`, `undo` |
+| `sh.comments` | `list`, `add`, `resolve`, `inbox`, `mark_seen` |
+| `sh.notifications` | `matrix`, `update_matrix`, `mute_client`, `unmute_client` |
 | `sh.flows` | `list`, `get`, `create`, `update`, `delete`, `activate`, `deactivate`, `add_node`, `update_node`, `add_edge`, `stats`, `collected_data`, `generate`, `pending`, `publish_changes`, `discard_changes` |
 | `sh.analytics` | `get`, `export`, `content_insights` |
 

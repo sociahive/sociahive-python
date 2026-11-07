@@ -93,6 +93,20 @@ CASES: list[tuple[str, Callable[[SociaHive], Any], str, dict[str, str], Any]] = 
     ("POST /webhooks", lambda sh: sh.webhooks.create(target_url="https://n8n.test/h", events=["post.published"]), "/webhooks", {}, {"target_url": "https://n8n.test/h", "events": ["post.published"]}),
     ("PATCH /webhooks/{id}", lambda sh: sh.webhooks.update(ID, active=False), f"/webhooks/{ID}", {}, {"active": False}),
     ("DELETE /webhooks/{id}", lambda sh: sh.webhooks.delete(ID), f"/webhooks/{ID}", {}, None),
+    ("GET /approvals", lambda sh: sh.approvals.list(scope="assigned", limit=20), "/approvals", {"scope": "assigned", "limit": "20"}, None),
+    ("GET /approvals/{postId}", lambda sh: sh.approvals.get(ID), f"/approvals/{ID}", {}, None),
+    ("POST /approvals/{postId}/decision", lambda sh: sh.approvals.approve(ID, content_hash="h1"), f"/approvals/{ID}/decision", {}, {"decision": "approved", "content_hash": "h1"}),
+    ("POST /approvals/{postId}/request-changes", lambda sh: sh.approvals.request_changes(ID, comment="Shorter caption"), f"/approvals/{ID}/request-changes", {}, {"comment": "Shorter caption"}),
+    ("POST /approvals/undo", lambda sh: sh.approvals.undo(ID2), "/approvals/undo", {}, {"batch_id": ID2}),
+    ("GET /comments/{postId}", lambda sh: sh.comments.list(ID), f"/comments/{ID}", {}, None),
+    ("POST /comments/{postId}", lambda sh: sh.comments.add(ID, body="Looks good", visibility="client"), f"/comments/{ID}", {}, {"body": "Looks good", "visibility": "client"}),
+    ("POST /comments/{postId}/{commentId}/resolve", lambda sh: sh.comments.resolve(ID, ID2), f"/comments/{ID}/{ID2}/resolve", {}, None),
+    ("GET /comments/inbox", lambda sh: sh.comments.inbox(limit=10), "/comments/inbox", {"limit": "10"}, None),
+    ("POST /comments/inbox/seen", lambda sh: sh.comments.mark_seen(ID), "/comments/inbox/seen", {}, {"post_id": ID}),
+    ("GET /me/notification-matrix", lambda sh: sh.notifications.matrix(), "/me/notification-matrix", {}, None),
+    ("PATCH /me/notification-matrix", lambda sh: sh.notifications.update_matrix(badge_scope="assigned"), "/me/notification-matrix", {}, {"badge_scope": "assigned"}),
+    ("POST /me/notification-matrix/mutes", lambda sh: sh.notifications.mute_client(ID), "/me/notification-matrix/mutes", {}, {"group_id": ID}),
+    ("DELETE /me/notification-matrix/mutes", lambda sh: sh.notifications.unmute_client(ID), "/me/notification-matrix/mutes", {"group_id": ID}, None),
 ]
 
 
@@ -263,7 +277,7 @@ class ContractTest(unittest.TestCase):
         if not generated.exists():
             self.skipTest("run inside the monorepo")
         keys = re.findall(r'^  "((?:GET|POST|PUT|PATCH|DELETE) /[^"]*)": \{', generated.read_text(), re.M)
-        program = re.compile(r"^(GET|POST|PUT|PATCH|DELETE) /(media-library|media/|uploads/|signatures|posting-slots|find-slot|client-invites|rss-feeds|calendar|webhooks|connected-accounts$|analytics|posts(/bulk|/\{id\}(/(schedule|publish|cancel|duplicate|link-clicks|review-links|plugs))?)?$|flows/\{id\}/pending)")
+        program = re.compile(r"^(GET|POST|PUT|PATCH|DELETE) /(media-library|media/|uploads/|signatures|posting-slots|find-slot|client-invites|rss-feeds|calendar|webhooks|approvals|comments|me/notification-matrix|connected-accounts$|analytics|posts(/bulk|/\{id\}(/(schedule|publish|cancel|duplicate|link-clicks|review-links|plugs))?)?$|flows/\{id\}/pending)")
         covered = {c[0] for c in CASES}
         self.assertEqual([k for k in keys if program.match(k) and k not in covered], [])
 

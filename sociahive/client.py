@@ -17,10 +17,13 @@ import httpx
 
 from .errors import SociaHiveError
 from .resources import (
+    Approvals,
     Calendar,
     ClientInvites,
+    Comments,
     LinkClicks,
     Media,
+    Notifications,
     Plugs,
     PostingSlots,
     ReviewLinks,
@@ -393,6 +396,9 @@ class SociaHive:
         self.client_invites = ClientInvites(self)
         self.rss_feeds = RssFeeds(self)
         self.webhooks = Webhooks(self)
+        self.approvals = Approvals(self)
+        self.comments = Comments(self)
+        self.notifications = Notifications(self)
 
     def close(self) -> None:
         self._http.close()

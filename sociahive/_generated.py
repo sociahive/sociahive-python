@@ -404,6 +404,52 @@ class NotificationPreferencesPatch(TypedDict, total=False):
     quiet_hours: "QuietHoursWindow"
 
 
+class NoticeMatrixCells(TypedDict, total=False):
+    in_app: bool
+    email: bool
+    push: bool
+    slack: bool
+    teams: bool
+    digest: bool
+
+
+class NoticeMatrix(TypedDict, total=False):
+    """Rows are events, columns are channels."""
+    waiting_approval: "NoticeMatrixCells"
+    changes_requested: "NoticeMatrixCells"
+    approved: "NoticeMatrixCells"
+    comment: "NoticeMatrixCells"
+    client_comment: "NoticeMatrixCells"
+    post_failed: "NoticeMatrixCells"
+    weekly_digest: "NoticeMatrixCells"
+    due_soon: "NoticeMatrixCells"
+    missed: "NoticeMatrixCells"
+    report_ready: "NoticeMatrixCells"
+    report_sent: "NoticeMatrixCells"
+    report_alert: "NoticeMatrixCells"
+
+
+class MutedClient(TypedDict, total=False):
+    group_id: str
+    name: str
+    until: str
+
+
+class NotificationMatrixResponse(TypedDict, total=False):
+    data: Dict[str, Any]
+
+
+class NotificationMatrixPatch(TypedDict, total=False):
+    cells: Dict[str, Any]
+    due_soon_through_quiet_hours: bool
+    badge_scope: Literal["assigned", "managed"]
+    timezone: str
+
+
+class MutedClientsResponse(TypedDict, total=False):
+    data: Dict[str, Any]
+
+
 class PostAutomationError(TypedDict, total=False):
     error: str
     code: str
@@ -666,6 +712,125 @@ class PlatformDestination(TypedDict, total=False):
     id: str
     label: str
     description: str
+
+
+class ApprovalError(TypedDict, total=False):
+    success: Any
+    error: str
+    code: str
+
+
+class ApprovalApprover(TypedDict, total=False):
+    user_id: str
+    kind: str
+    name: str
+    decision: str
+    decided_at: str
+    you: bool
+
+
+class ApprovalStepView(TypedDict, total=False):
+    index: int
+    name: str
+    kind: str
+    rule: str
+    status: str
+    approvers: List["ApprovalApprover"]
+    decided_at: str
+    override_by: str
+
+
+class ApprovalView(TypedDict, total=False):
+    post_id: str
+    state: str
+    steps: List["ApprovalStepView"]
+    current_step: Union[int, None]
+    content_hash: str
+    can_decide: bool
+    can_submit: bool
+    return_step_name: str
+    changes_requested: Dict[str, Any]
+    publishes_without_approval_at: str
+    time_passed: bool
+    owner_fallback: bool
+    client_step_fallback: bool
+    reconnect: List[str]
+
+
+class WaitingApproval(TypedDict, total=False):
+    post_id: str
+    owner_id: str
+    text: str
+    scheduled_at: str
+    step_name: str
+    step_index: int
+    step_count: int
+    platforms: List[str]
+    can_decide: bool
+    reason: Literal["assigned", "manager"]
+    client: str
+    client_group_id: str
+    workspace_name: str
+    content_hash: str
+    media: Dict[str, Any]
+
+
+class ApprovalUndo(TypedDict, total=False):
+    batch_id: str
+    until: str
+
+
+class CommentError(TypedDict, total=False):
+    success: Any
+    error: str
+    code: str
+
+
+class CommentTarget(TypedDict, total=False):
+    platform: str
+    range: Dict[str, Any]
+    image: Dict[str, Any]
+
+
+class PostComment(TypedDict, total=False):
+    id: str
+    parent_id: str
+    visibility: str
+    author: Dict[str, Any]
+    body: str
+    target: "CommentTarget"
+    suggestion: Dict[str, Any]
+    review_decision: str
+    status: str
+    created_at: str
+    edited: bool
+    deleted: bool
+    can_edit: bool
+    can_delete: bool
+    text_changed: bool
+
+
+class PostCommentThreads(TypedDict, total=False):
+    threads: List[Dict[str, Any]]
+    members: List[Dict[str, Any]]
+    single_seat: bool
+    can_comment: bool
+    can_accept: bool
+
+
+class CommentsInboxItem(TypedDict, total=False):
+    thread_id: str
+    post_id: str
+    owner_id: str
+    post_title: str
+    client: str
+    client_group_id: str
+    workspace_name: str
+    reason: str
+    from_client: bool
+    last_comment: Dict[str, Any]
+    comment_count: int
+    unread: bool
 
 
 class BulkPostActionRequest(TypedDict, total=False):
